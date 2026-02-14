@@ -1,0 +1,7 @@
+config.yaml
+browser_data/
+uploads.json
+__pycache__/
+*.pyc
+*.mp4
+.venv/

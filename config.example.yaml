@@ -1,0 +1,9 @@
+youtube:
+  playlist_name: "SIG Windows Meetings"
+  thumbnail_file: "thumbnail.png"
+
+defaults:
+  title_format: "Kubernetes SIG Windows {date}"
+  description: "Kubernetes SIG Windows weekly meeting recording."
+  privacy_status: "public"
+  made_for_kids: false
