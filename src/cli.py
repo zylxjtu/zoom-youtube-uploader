@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import sys
+import tempfile
 from datetime import date
 from pathlib import Path
 
@@ -144,7 +145,7 @@ def run() -> None:
 
         # 7. Download MP4 from Zoom
         filename = f"{title.replace(' ', '_')}.mp4"
-        dest_path = Path(filename)
+        dest_path = Path(tempfile.gettempdir()) / filename
 
         if dest_path.exists():
             console.print(f"[yellow]File already exists: {dest_path} — skipping download.[/yellow]")
