@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import platform
 from pathlib import Path
 from typing import Optional
 
@@ -97,7 +98,8 @@ class YouTubeClient:
         # Set title
         title_box = page.locator("#title-textarea #textbox")
         title_box.click()
-        page.keyboard.press("Control+a")
+        select_all = "Meta+a" if platform.system() == "Darwin" else "Control+a"
+        page.keyboard.press(select_all)
         page.keyboard.type(title, delay=15)
 
         # Set description

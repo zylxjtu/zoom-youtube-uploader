@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import platform
 import re
 from datetime import date
 from getpass import getpass
@@ -36,7 +35,7 @@ class ZoomClient:
 
         if not email or not password:
             console.print("Zoom credentials not found. Enter them now "
-                          "(stored in Windows Credential Manager):\n")
+                          "(stored securely in your OS credential store):\n")
             if not email:
                 email = input("  Zoom email: ").strip()
                 keyring.set_password(SERVICE_NAME, "zoom_email", email)

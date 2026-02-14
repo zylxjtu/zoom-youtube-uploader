@@ -7,7 +7,7 @@ CLI tool that downloads SIG Windows meeting recordings from Zoom and uploads the
 ### 1. Install dependencies
 
 ```bash
-cd D:\ai\zoom-youtube-uploader
+cd zoom-youtube-uploader
 pip install -r requirements.txt
 python -m playwright install chromium
 ```
