@@ -148,8 +148,24 @@ def run() -> None:
         dest_path = Path(tempfile.gettempdir()) / filename
 
         if dest_path.exists():
-            console.print(f"[yellow]File already exists: {dest_path} — skipping download.[/yellow]")
-        else:
+            # Validate existing file before reusing it
+            size = dest_path.stat().st_size
+            if size == 0:
+                console.print("[red]Existing file is empty — re-downloading.[/red]")
+                dest_path.unlink()
+            else:
+                with open(dest_path, "rb") as f:
+                    header = f.read(8)
+                if len(header) < 8 or header[4:8] != b"ftyp":
+                    console.print("[red]Existing file is not a valid MP4 — re-downloading.[/red]")
+                    dest_path.unlink()
+                else:
+                    console.print(
+                        f"[yellow]File already exists: {dest_path} "
+                        f"({size / (1024 * 1024):.1f} MB) — skipping download.[/yellow]"
+                    )
+
+        if not dest_path.exists():
             console.print()
             with console.status("Downloading recording (watch browser)..."):
                 try:

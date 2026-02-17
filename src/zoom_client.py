@@ -258,7 +258,33 @@ class ZoomClient:
                 download_btn.click()
 
         download = download_info.value
+
+        # Check for download failure
+        failure = download.failure()
+        if failure:
+            raise RuntimeError(f"Download failed: {failure}")
+
         download.save_as(str(dest_path))
+
+        # Validate the downloaded file
+        size = dest_path.stat().st_size
+        if size == 0:
+            dest_path.unlink(missing_ok=True)
+            raise RuntimeError("Downloaded file is empty (0 bytes).")
+
+        # Check MP4 magic bytes — valid MP4s have "ftyp" at offset 4
+        with open(dest_path, "rb") as f:
+            header = f.read(12)
+        if len(header) < 8 or header[4:8] != b"ftyp":
+            # Might be an HTML error page from Zoom
+            snippet = header[:64]
+            dest_path.unlink(missing_ok=True)
+            raise RuntimeError(
+                f"Downloaded file is not a valid MP4 (header: {snippet!r}). "
+                "Zoom may have returned an error page instead of the video."
+            )
+
+        console.print(f"[dim]File size: {size / (1024 * 1024):.1f} MB[/dim]")
         return dest_path
 
     def close_page(self) -> None:

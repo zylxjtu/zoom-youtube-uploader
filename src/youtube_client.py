@@ -153,18 +153,68 @@ class YouTubeClient:
 
         page.wait_for_timeout(1000)
 
-        # Wait for upload to finish (done button becomes enabled)
+        # Wait for upload/processing to finish while checking for errors
         try:
             page.wait_for_function(
                 """() => {
+                    // Check for error states in the upload dialog
+                    const errorSelectors = [
+                        '.error-area',
+                        '.error-message',
+                        '[class*="error"]',
+                        '.upload-error',
+                    ];
+                    for (const sel of errorSelectors) {
+                        const el = document.querySelector(sel);
+                        if (el && el.offsetParent !== null && el.textContent.trim()) {
+                            const text = el.textContent.trim().toLowerCase();
+                            if (text.includes('abandoned') || text.includes('failed')
+                                || text.includes('error') || text.includes('problem')
+                                || text.includes('can\\'t process') || text.includes('unable')) {
+                                window.__ytUploadError = el.textContent.trim();
+                                return true;
+                            }
+                        }
+                    }
+
+                    // Check all visible text for "processing abandoned"
+                    const body = document.body.innerText.toLowerCase();
+                    if (body.includes('processing abandoned')
+                        || body.includes('upload failed')
+                        || body.includes('can\\'t process this video')
+                        || body.includes('server rejected')) {
+                        window.__ytUploadError = 'Upload error detected in page';
+                        return true;
+                    }
+
+                    // Check if done button is enabled (upload succeeded)
                     const btn = document.querySelector('#done-button');
-                    if (btn && btn.getAttribute('aria-disabled') !== 'true') return true;
+                    if (btn && btn.getAttribute('aria-disabled') !== 'true') {
+                        window.__ytUploadError = '';
+                        return true;
+                    }
                     return false;
                 }""",
                 timeout=600_000,
             )
-        except Exception:
-            page.wait_for_timeout(5000)
+        except Exception as e:
+            page.screenshot(path="yt_debug_upload_timeout.png")
+            progress = self._get_upload_status_text()
+            raise RuntimeError(
+                f"Upload timed out. Progress at timeout: {progress}. "
+                f"Screenshot saved to yt_debug_upload_timeout.png"
+            ) from e
+
+        # Check if the wait ended due to an error rather than success
+        upload_error = page.evaluate("() => window.__ytUploadError || ''")
+        if upload_error:
+            page.screenshot(path="yt_debug_upload_error.png")
+            status_text = self._get_upload_status_text()
+            raise RuntimeError(
+                f"YouTube upload error: {upload_error}. "
+                f"Status text: {status_text}. "
+                f"Screenshot saved to yt_debug_upload_error.png"
+            )
 
         page.wait_for_timeout(1000)
 
@@ -245,6 +295,50 @@ class YouTubeClient:
         except Exception as e:
             console.print(f"[yellow]Could not set playlist — skipping.[/yellow]")
             self._dismiss_overlays()
+
+    def _get_upload_status_text(self) -> str:
+        """Extract upload progress/status text from the YouTube Studio dialog."""
+        page = self._page
+        try:
+            return page.evaluate("""() => {
+                const parts = [];
+
+                // Look for progress text (e.g., "Uploading 45%..." or "Processing...")
+                const progressSelectors = [
+                    '.progress-label',
+                    '.upload-progress',
+                    '.status-text',
+                    'ytcp-upload-progress-bar',
+                    '.upload-status',
+                    '[class*="progress"]',
+                    '[class*="upload"] [class*="status"]',
+                ];
+                for (const sel of progressSelectors) {
+                    const el = document.querySelector(sel);
+                    if (el && el.textContent.trim()) {
+                        parts.push(sel + ': ' + el.textContent.trim().substring(0, 200));
+                    }
+                }
+
+                // Grab text from the upload dialog area
+                const dialog = document.querySelector('ytcp-uploads-dialog');
+                if (dialog) {
+                    // Get all visible text spans that might contain status
+                    const spans = dialog.querySelectorAll(
+                        'span, .label, .message, [class*="text"], [class*="label"]'
+                    );
+                    for (const span of spans) {
+                        const t = span.textContent.trim();
+                        if (t && t.length > 3 && t.length < 300) {
+                            parts.push(t);
+                        }
+                    }
+                }
+
+                return [...new Set(parts)].slice(0, 15).join(' | ');
+            }""")
+        except Exception:
+            return "(could not read status)"
 
     def _extract_video_id(self) -> str:
         """Extract video ID from success dialog or page URL."""
