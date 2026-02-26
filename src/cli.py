@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import argparse
 import json
 import sys
 import tempfile
@@ -23,6 +24,27 @@ BROWSER_DATA_DIR = "browser_data"
 UPLOAD_LOG = "uploads.json"
 
 
+def _parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Zoom Recording -> YouTube Uploader")
+    parser.add_argument(
+        "--date", "-d",
+        default=None,
+        help="Meeting date: YYYY-MM-DD, YYYYMMDD, MM-DD, 'today', or 'yesterday' (interactive if omitted)",
+    )
+    parser.add_argument(
+        "--select", "-s",
+        type=int,
+        default=None,
+        help="Recording number to select (1-based). Auto-selects if only one recording.",
+    )
+    parser.add_argument(
+        "--force-reupload", "-f",
+        action="store_true",
+        help="Re-upload even if already uploaded (skip confirmation prompt)",
+    )
+    return parser.parse_args()
+
+
 def _load_upload_log() -> dict:
     path = Path(UPLOAD_LOG)
     if path.exists():
@@ -34,12 +56,15 @@ def _save_upload_log(log: dict) -> None:
     Path(UPLOAD_LOG).write_text(json.dumps(log, indent=2))
 
 
-def _prompt_date() -> date:
-    """Prompt user for a meeting date."""
-    text = Prompt.ask(
-        "Meeting date",
-        default="today",
-    )
+def _prompt_date(cli_date: str | None = None) -> date:
+    """Prompt user for a meeting date, or use CLI arg if provided."""
+    if cli_date is not None:
+        text = cli_date
+    else:
+        text = Prompt.ask(
+            "Meeting date",
+            default="today",
+        )
     try:
         return parse_date_input(text)
     except ValueError as e:
@@ -61,16 +86,19 @@ def _display_recordings(recordings: list[ZoomRecording]) -> None:
     console.print(table)
 
 
-def _select_recording(recordings: list[ZoomRecording]) -> int:
+def _select_recording(recordings: list[ZoomRecording], cli_select: int | None = None) -> int:
     """Let user select a recording, auto-select if only one. Returns index."""
     if len(recordings) == 1:
         console.print(f"Auto-selected: [bold]{recordings[0].topic}[/bold]")
         return 0
 
-    idx = IntPrompt.ask(
-        "Select recording number",
-        default=1,
-    )
+    if cli_select is not None:
+        idx = cli_select
+    else:
+        idx = IntPrompt.ask(
+            "Select recording number",
+            default=1,
+        )
     if idx < 1 or idx > len(recordings):
         console.print("[red]Invalid selection.[/red]")
         sys.exit(1)
@@ -79,13 +107,14 @@ def _select_recording(recordings: list[ZoomRecording]) -> int:
 
 def run() -> None:
     """Main CLI flow."""
-    console.print("[bold]Zoom Recording → YouTube Uploader[/bold]\n")
+    args = _parse_args()
+    console.print("[bold]Zoom Recording -> YouTube Uploader[/bold]\n")
 
     # 1. Load config
     config = load_config()
 
-    # 2. Prompt for date
-    recording_date = _prompt_date()
+    # 2. Prompt for date (or use --date)
+    recording_date = _prompt_date(args.date)
     console.print(f"Looking up recordings for: [cyan]{recording_date.isoformat()}[/cyan]\n")
 
     # 3. Launch browser (shared by Zoom and YouTube)
@@ -128,7 +157,7 @@ def run() -> None:
         else:
             _display_recordings(recordings)
             console.print()
-            selected = recordings[_select_recording(recordings)]
+            selected = recordings[_select_recording(recordings, args.select)]
 
         title = config.defaults.title_format.format(
             date=format_date_for_title(recording_date)
@@ -139,7 +168,9 @@ def run() -> None:
         if title in upload_log:
             prev = upload_log[title]
             console.print(f"[yellow]Already uploaded: {prev}[/yellow]")
-            if not Confirm.ask("Upload again?", default=False):
+            if args.force_reupload:
+                console.print("[cyan]--force-reupload: proceeding.[/cyan]")
+            elif not Confirm.ask("Upload again?", default=False):
                 console.print("Aborted.")
                 sys.exit(0)
 
