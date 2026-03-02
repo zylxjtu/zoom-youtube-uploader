@@ -12,6 +12,18 @@ pip install -r requirements.txt
 python -m playwright install chromium
 ```
 
+**Linux/Ubuntu** — Playwright needs additional OS libraries. Install them with:
+
+```bash
+python -m playwright install-deps chromium
+```
+
+Keyring requires a secret service backend. On desktop Ubuntu (GNOME), `gnome-keyring` is usually pre-installed. On a headless server or WSL without a desktop environment, install the `keyrings.alt` package to use a file-based backend:
+
+```bash
+pip install keyrings.alt
+```
+
 ### 2. Create config file
 
 ```bash
