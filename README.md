@@ -60,6 +60,29 @@ The tool will:
 9. Print the YouTube video URL
 10. Delete the downloaded MP4
 
+## Authentication
+
+### Zoom
+
+- Credentials (email + password) are stored in your **OS keyring** (Windows Credential Manager / macOS Keychain / Linux keyring) under the service name `zoom-youtube-uploader`.
+- On first run, if no credentials are found, the tool prompts you interactively and saves them to the keyring.
+- During login, Playwright auto-fills email/password. If 2FA or CAPTCHA is required, the browser window pauses for you to complete login manually (5-minute timeout).
+
+### YouTube
+
+- No credentials are stored — YouTube/Google login is done **entirely manually** in the browser window. The tool navigates to YouTube Studio and waits if you need to sign in.
+
+### Session Persistence
+
+Both services share a **single persistent Chromium browser context** stored in the `browser_data/` directory. This directory holds cookies, localStorage, and other browser state — like a regular Chrome profile.
+
+As long as `browser_data/` exists, both Zoom and YouTube sessions stay logged in via browser cookies:
+
+- **Zoom**: Session cookies typically last ~2 weeks of inactivity, or expire immediately if you log out elsewhere.
+- **YouTube/Google**: Sessions tend to last weeks to months, but Google may prompt re-auth after ~30 days, on suspicious activity, or after a password change.
+
+Deleting `browser_data/` will require re-authentication for both services on the next run.
+
 ### First run
 
 A Chromium browser window opens. You'll log into both Zoom and YouTube manually. Sessions are saved in `browser_data/` so you only log in once.
